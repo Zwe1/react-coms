@@ -1,0 +1,66 @@
+@lineHeight: 30px;
+@fontSize: 15px;
+.baseSize{
+  line-height: @lineHeight;
+  font-size: @fontSize;
+  color: #000;
+}
+.wea-permission{
+  top: 45px;
+  @media only screen and (min-height: 780px) {
+    top: 120px;
+  }
+  .ant-modal-body{
+    padding: 15px;
+  }
+  .permission-list{
+    margin-top: 5px;
+    .ant-list-header{
+      text-align: right;
+    }
+    .ant-list-item{
+      .ant-list-item-content{
+        .baseSize;
+        width: 100%;
+        max-width: 200px;
+        text-overflow: ellipsis;
+        img{
+          margin-right: 10px;
+        }
+      }
+      .ant-checkbox-wrapper{
+        cursor: pointer;
+        padding: 4px 0 4px 180px;
+      }
+    }
+  }
+  .hrm-header{
+    float: right;
+    color: rgba(0,0,0,.65);
+    span{
+      margin-right: 15px;
+    }
+  }
+  .permission-tree{
+    li{
+      position: relative;
+      span.ant-tree-switcher{
+        line-height: 18px;
+      }
+      .ant-tree-node-content-wrapper{
+        position: static;
+        .wea-tree-title{
+          .ant-checkbox-wrapper{
+            z-index: 10;
+            position: absolute;
+            right: 65px;
+            top: 7px;
+            &:last-child{
+              right: 20px;
+            }
+          }
+        }
+      }
+    }
+  }
+}
