@@ -1,4 +1,5 @@
 export default class tools {
+
   /**
    * 数据二次处理，生成组织结构树
    */
@@ -25,4 +26,11 @@ export default class tools {
     }
     return children;
   };
-}
+
+  //空数组不处理直接返回
+  isEmptyArr = (data) => {
+    if (!data || data.length === 0) {
+      return
+    }
+  };
+};

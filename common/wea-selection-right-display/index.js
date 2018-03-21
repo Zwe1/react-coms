@@ -2,7 +2,7 @@ import React from 'react';
 import {observer} from 'mobx-react';
 import {toJS} from 'mobx';
 // 导入antd组件
-import {Icon, Button} from 'antd';
+import {Icon} from 'antd';
 import MediaUtil from '../../../utils/media';
 
 /**
@@ -44,7 +44,7 @@ class WeaSelectionRightDisplay extends React.Component {
           this.props.type == "hrm" && selectedNodes.managedepartlist && selectedNodes.managedepartlist.length > 0 ?
             <div>
               <div>具有管理权限</div>
-              <div style={{display: "inline-block", marginTop: 10, marginBottom: 10}}>
+              <div style={{display: "inline-block"}}>
                 {
                   selectedNodes.managedepartlist.map(dept => {
                     return (
@@ -84,7 +84,7 @@ class WeaSelectionRightDisplay extends React.Component {
           this.props.type == "hrm" && selectedNodes.viewdepartlist && selectedNodes.viewdepartlist.length > 0 ?
             <div>
               <div>具有查看权限</div>
-              <div style={{display: "inline-block", marginTop: 10, marginBottom: 10}}>
+              <div style={{display: "inline-block"}}>
                 {
                   selectedNodes.viewdepartlist.map(dept => {
                     return (
@@ -123,7 +123,7 @@ class WeaSelectionRightDisplay extends React.Component {
           this.props.type == "agent" && selectedNodes.manageagentlist && selectedNodes.manageagentlist.length > 0 ?
             <div>
               <div>具有管理权限</div>
-              <div style={{display: "inline-block", marginTop: 10}}>
+              <div style={{display: "inline-block"}}>
                 {
                   selectedNodes.manageagentlist.map(agent => {
                     return (
@@ -131,8 +131,8 @@ class WeaSelectionRightDisplay extends React.Component {
                         key={agent.open_id}
                         style={{border: "1px solid #999999", padding: "5px 5px", marginRight: "10px"}}
                       >
-                  <img width={25} height={25} alt="" src={MediaUtil.getMediaUrl(agent.media_id)}
-                       style={{marginBottom: 5, marginRight: 5}}/>
+                        <img width={29} height={29} alt="" src={MediaUtil.getMediaUrl(agent.media_id)}
+                             style={{marginBottom: 5, marginRight: 5, marginLeft: -5}}/>
                         {agent.name}
                         {
                           this.props.deleteIconDisabled ?
@@ -149,7 +149,7 @@ class WeaSelectionRightDisplay extends React.Component {
                               />
                             )
                         }
-                </span>
+                      </span>
                     );
                   })
                 }

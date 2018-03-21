@@ -1,7 +1,6 @@
 import React from 'react';
-import PropTypes from 'prop-types';
 import { Scrollbars } from 'react-custom-scrollbars';
-import { Tree, Input, Icon, Modal, Checkbox, Tabs } from 'antd';
+import { Tree, Input, Icon, Modal, Checkbox, Tabs, Dropdown, Menu } from 'antd';
 import './styles/weatransfer.less';
 import tools from './utils/tools';
 import Request from './utils/server';
@@ -13,8 +12,11 @@ export default class WeaTransfer extends React.Component {
   static defaultProps = {
     title: '选择范围',
     subtitle: '已选择数据',
-    advanced: ['dept'],
-    placeholder: "搜索部门"
+    advanced: [ 'dept' ],
+    placeholder: "搜索部门",
+    mode: 'async',
+    singleElection: false,
+    globalSearch: false
   };
 
   constructor(props) {
@@ -37,7 +39,15 @@ export default class WeaTransfer extends React.Component {
       taglist: [],//标签列表
       searchData: [],//搜索对比数据
       orgPerson: [],
-      smallScreen: false
+      smallScreen: false,
+      asyncTreeData: [],//异步组织架构树
+      orgDimension: [], //组织维度列表
+      activeDemision: {
+        orgid: 1,
+        orgName: ''
+      },//当前组织维度
+      isSearching: false,//搜索中
+      searchValue: {},
     };
     this.userex = 'userlist-+';
     this.tagex = 'taglist-+-';
@@ -47,7 +57,7 @@ export default class WeaTransfer extends React.Component {
   };
 
   componentDidMount() {
-    const { advanced } = this.props;
+    const { advanced, mode } = this.props;
 
     if (window.innerWidth < 1600) {
       this.setState({
@@ -55,13 +65,43 @@ export default class WeaTransfer extends React.Component {
       })
     }
 
-    //获取MobTransfer组件组织结构（部门及人员）
-    this.Request.getOrgInTransfer((depts,data) => this.setState({
-      searchData: depts,
-      orgPerson: data
-    }));
+    if (mode === 'async') {
+      this.Request.getOrgAsyncInTransfer(0, null, json => {
+        const org = json.department.filter(item => item.id === 1);
+        if (org.length === 1) {
+          this.setState({
+            asyncTreeData: [ {
+              'name': org[ 0 ].name,
+              'key': org[ 0 ].id,
+              'id': org[ 0 ].id,
+              'isLeaf': !org[ 0 ].hasnext,
+              'order': org[ 0 ].order,
+            } ],
+            orgDimension: json.department.map(item => {
+              return {
+                'name': item.name,
+                'key': item.id,
+                'id': item.id,
+                'isLeaf': !item.hasnext,
+                'order': item.order,
+              }
+            }),
+            activeDemision: {
+              orgid: org[ 0 ].id,
+              orgName: org[ 0 ].name
+            },
+          })
+        }
+      });
+    } else {
+      //获取MobTransfer组件组织结构（部门及人员）
+      this.Request.getOrgInTransfer((depts, data) => this.setState({
+        searchData: depts,
+        orgPerson: data
+      }));
+    }
 
-    if (advanced.includes('tag')){
+    if (advanced.includes('tag')) {
       //获取企业标签列表
       this.Request.getTagList((taglist) => {
         this.setState({
@@ -92,7 +132,6 @@ export default class WeaTransfer extends React.Component {
 
     //按输入为组件添加默认选中和默认展开
     if (props.defaultSelected) {
-
       if (props.defaultSelected === this.state.selected) {
 
         return false
@@ -113,18 +152,24 @@ export default class WeaTransfer extends React.Component {
           }
           keys.mydept = selected.mydept;
           nodes.mydept = selected.mydept;
-          unsortNodes.push({id: 'mydept', key: 'mydept', name: '本部门'});
+          unsortNodes.push({ id: 'mydept', key: 'mydept', name: '本部门' });
         }
         for (let t in selected) {
-          let ex = { 'userlist' : this.userex, 'deptlist' : this.deptex, 'partylist' : this.partyex, 'taglist' : this.tagex };
-          selected[t] instanceof Array && selected[t].forEach(item => {
-            id = `${ex[t]}${item.id}`;
-            newitem = {'id': id, 'name': item.name};
-            keys[t].push(id);
-            nodes[t].push(newitem);
+          let ex = {
+            'userlist': this.userex,
+            'deptlist': this.deptex,
+            'partylist': this.partyex,
+            'taglist': this.tagex
+          };
+          selected[ t ] instanceof Array && selected[ t ].forEach(item => {
+            id = `${ex[ t ]}${item.id}`;
+            newitem = { 'id': id, 'name': item.name };
+            keys[ t ].push(id);
+            nodes[ t ].push(newitem);
             unsortNodes.push(newitem);
           });
-        };
+        }
+        ;
 
         this.setState({
           selected: keys,
@@ -146,7 +191,9 @@ export default class WeaTransfer extends React.Component {
       subtitle,
       visible,
       advanced,
-      placeholder
+      placeholder,
+      mode,
+      singleElection
     } = this.props;
 
     const {
@@ -156,10 +203,32 @@ export default class WeaTransfer extends React.Component {
       taglist,
       orgPerson,
       autoExpandParent,
-      smallScreen
+      smallScreen,
+      asyncTreeData,
+      orgDimension,
+      activeDemision,
+      isSearching,
+      searchValue
     } = this.state;
 
     const tagshow = advanced.length === 1 && advanced.includes('tag');
+
+    const menu = (
+      <Menu
+        className="demension-dropdown"
+        onClick={this.changeDimension}
+      >
+        {orgDimension.length > 0 && orgDimension.map(org => {
+          return (
+            <Menu.Item
+              key={org.id}
+              className={activeDemision.orgid == org.id ? 'dimension-menu-item' : ''}
+            >
+              {org.name}
+            </Menu.Item>
+          )
+        })}
+      </Menu>);
 
     return (
       <Modal
@@ -167,19 +236,32 @@ export default class WeaTransfer extends React.Component {
         visible={visible}
         onOk={this.onOk}
         onCancel={this.cancel}
+        zIndex="1001"
         style={{
           top: smallScreen ? 30 : 100
         }}
-        width={850}
+        width={ singleElection ? 424 : 850 }
         okText="确认"
         cancelText="取消"
       >
         <div className="member-tree transferTree">
+
           <Search
-            style={{ marginBottom: 8 }}
             placeholder={placeholder}
             onSearch={(val) => this.search(val)}
           />
+
+          <Dropdown
+            overlay={menu}
+            className="demension-dropdown"
+            placement="bottomLeft"
+            trigger={[ 'click' ]}
+          >
+            <div>
+              {activeDemision.orgName} <Icon type="down"/>
+            </div >
+          </Dropdown>
+
           {advanced.includes('tag') && !tagshow &&
           <div className="type">
             <Tabs onChange={this.changeLeftContent}>
@@ -190,7 +272,7 @@ export default class WeaTransfer extends React.Component {
           <Scrollbars
             autoHide
             style={{
-              height: advanced.includes('tag') ? 352 : 400,
+              height: advanced.includes('tag') ? 325 : 373,
               background: '#F9FAFC'
             }}
           >
@@ -199,31 +281,36 @@ export default class WeaTransfer extends React.Component {
               onChange={this.mineDept}
               ref="mydept"
               name="mydept"
-              style={{marginLeft:29,marginTop:10}}
+              style={{ marginLeft: 29, marginTop: 10 }}
               checked={mydeptChecked}
             >
               本部门
             </Checkbox>}
 
             {leftContent === 'tree' && (advanced.includes('dept') || advanced.includes('party') || this.state.disabled) &&
-            <Tree
-              key
-              onExpand={this.onExpand}
-              expandedKeys={expandedKeys}
-              onSelect={this.onSelect}
-              autoExpandParent={autoExpandParent}
-            >
-              {this.treeRnder(orgPerson)}
-            </Tree>}
-            {(leftContent === 'tag' || tagshow) &&
-            <Tree
-              key
-              onSelect={this.onSelect}
-            >
-              {this.tagRender(taglist)}
-            </Tree>}
+            (isSearching ?
+              <div>
+                {this.searchedRender(searchValue)}
+              </div> :
+              <Tree
+                key
+                loadData={mode === 'async' && this.onLoadData}
+                onExpand={this.onExpand}
+                expandedKeys={expandedKeys}
+                onSelect={this.onSelect}
+                autoExpandParent={autoExpandParent}
+              >
+                {
+                  mode === 'async' ?
+                    this.renderTreeNodes(asyncTreeData) :
+                    this.treeRnder(orgPerson)
+                }
+              </Tree>)
+            }
+            {(leftContent === 'tag' || tagshow) && this.tagRender(taglist)}
           </Scrollbars>
         </div>
+        {!singleElection &&
         <div className="transferSelectedContent">
           <ul>
             <li className="title">{subtitle}<span onClick={this.reset}>清空</span></li>
@@ -238,10 +325,44 @@ export default class WeaTransfer extends React.Component {
             </Scrollbars>
           </ul>
         </div>
+        }
       </Modal>
     )
   }
 
+  /**
+   * 切换组织维度
+   */
+  changeDimension = (val) => {
+    const { activeDemision, orgDimension } = this.state;
+    if (val.key != activeDemision.orgid) {
+      this.setState({
+        activeDemision: {
+          orgid: val.key,
+          orgName: val.item.props.children
+        },
+        asyncTreeData: orgDimension.filter(item => item.id == val.key)
+      });
+    }
+  };
+
+
+  onLoadData = (treeNode) => {
+    return new Promise((resolve) => {
+      if (treeNode.props.children) {
+        resolve();
+        return;
+      }
+
+      const p = this.Request
+        .getOrgAsyncInTransfer(treeNode.props.id, treeNode);
+
+      p.then(() => {
+        this.setState({ asyncTreeData: [ ...this.state.asyncTreeData ] });
+        resolve();
+      });
+    });
+  };
   /**
    * 选择是否包含本部门
    */
@@ -257,7 +378,7 @@ export default class WeaTransfer extends React.Component {
     if (e.target.checked) {
       arr.mydept = 5;
       arr1.mydept = 5;
-      newNodes = [...newNodes,{id: key, name: '本部门'}];
+      newNodes = [ ...newNodes, { id: key, name: '本部门' } ];
       this.setState({
         mydeptChecked: !this.state.mydeptChecked,
         selected: arr,
@@ -267,7 +388,7 @@ export default class WeaTransfer extends React.Component {
     } else if (!e.target.checked) {
       arr.mydept = 0;
       arr1.mydept = 0;
-      newNodes.splice(newNodes.indexOf(newNodes.filter(item => item.id === key)[0]), 1);
+      newNodes.splice(newNodes.indexOf(newNodes.filter(item => item.id === key)[ 0 ]), 1);
       this.setState({
         mydeptChecked: !this.state.mydeptChecked,
         selected: arr,
@@ -305,14 +426,14 @@ export default class WeaTransfer extends React.Component {
 
     if (e.target.checked) {
 
-      obj.deptlist.splice(obj.deptlist.indexOf(key),1);
+      obj.deptlist.splice(obj.deptlist.indexOf(key), 1);
       obj.partylist.push(`${this.partyex}${key.slice(10)}`);
-      let item = obj1.deptlist.filter(item => item.id === key)[0];
+      let item = obj1.deptlist.filter(item => item.id === key)[ 0 ];
       if (item && item.id) {
         item.id = `${this.partyex}${item.id.slice(10)}`;
       }
       obj1.partylist.push(item);
-      obj1.deptlist.splice(obj1.deptlist.indexOf(obj1.deptlist.filter(item => item.id.slice(10) === key.slice(10))[0]),1);
+      obj1.deptlist.splice(obj1.deptlist.indexOf(obj1.deptlist.filter(item => item.id.slice(10) === key.slice(10))[ 0 ]), 1);
       unsortNodes.forEach(item => {
         if (item.id === key) {
           let tail = item.id.slice(10);
@@ -325,14 +446,14 @@ export default class WeaTransfer extends React.Component {
         unsortNodes: unsortNodes
       })
     } else {
-      obj.partylist.splice(obj.partylist.indexOf(key),1);
+      obj.partylist.splice(obj.partylist.indexOf(key), 1);
       obj.deptlist.push(`${this.deptex}${key.slice(10)}`);
-      let item = obj1.partylist.filter(item => item.id === key)[0];
+      let item = obj1.partylist.filter(item => item.id === key)[ 0 ];
       if (item.id) {
         item.id = `${this.deptex}${item.id.slice(10)}`;
       }
       obj1.deptlist.push(item);
-      obj1.partylist.splice(obj1.partylist.indexOf(obj1.partylist.filter(item => item.id.slice(10) === key.slice(10))[0]),1);
+      obj1.partylist.splice(obj1.partylist.indexOf(obj1.partylist.filter(item => item.id.slice(10) === key.slice(10))[ 0 ]), 1);
       unsortNodes.forEach(item => {
         if (item.id === key) {
           let tail = item.id.slice(10);
@@ -352,7 +473,7 @@ export default class WeaTransfer extends React.Component {
    * 清空搜索框
    */
   cancel = () => {
-    const {  onCancel } = this.props;
+    const { onCancel } = this.props;
     this.setState({
       mydeptChecked: false,
       unsortNodes: [],
@@ -392,23 +513,23 @@ export default class WeaTransfer extends React.Component {
     const { selected, selectedNodes } = this.state;
 
     for (let key of Object.keys(selected)) {
-      if ( selected[key] instanceof Array && selected[key].length > 0) {
-        selected[key] = selected[key].map(item => {
+      if (selected[ key ] instanceof Array && selected[ key ].length > 0) {
+        selected[ key ] = selected[ key ].map(item => {
           return item.slice(10);
         })
       }
     }
 
     for (let key of Object.keys(selectedNodes)) {
-      if ( selectedNodes[key] instanceof Array && selectedNodes[key].length > 0) {
-        selectedNodes[key].forEach(item => {
+      if (selectedNodes[ key ] instanceof Array && selectedNodes[ key ].length > 0) {
+        selectedNodes[ key ].forEach(item => {
           item.id = item.id.slice(10);
         })
       }
     }
 
     //调用传入的提交函数
-    onSubmit(selected,selectedNodes);
+    onSubmit(selected, selectedNodes);
 
     //清空数据
     this.setState({
@@ -429,7 +550,7 @@ export default class WeaTransfer extends React.Component {
     if (key === 'mydept') {
       arr.mydept = 0;
       arr1.mydept = 0;
-      newNodes.splice(newNodes.indexOf(newNodes.filter(item => item.id === key)[0]), 1);
+      newNodes.splice(newNodes.indexOf(newNodes.filter(item => item.id === key)[ 0 ]), 1);
       this.setState({
         mydeptChecked: false,
         selected: arr,
@@ -439,7 +560,7 @@ export default class WeaTransfer extends React.Component {
       return
     }
 
-    let keypiece = key.slice(0,10);
+    let keypiece = key.slice(0, 10);
     let ex = '';
     switch (keypiece) {
       case this.userex:
@@ -454,11 +575,12 @@ export default class WeaTransfer extends React.Component {
       case this.tagex:
         ex = 'taglist';
         break;
-    };
-    arr[ex].splice(arr[ex].indexOf(key), 1);
+    }
+    ;
+    arr[ ex ].splice(arr[ ex ].indexOf(key), 1);
     //filter过滤后数据为数组，需要取第一项
-    arr1[ex].splice(arr1[ex].indexOf(arr1[ex].filter(item => item.id === key)[0]), 1);
-    newNodes.splice(newNodes.indexOf(newNodes.filter(item => item.id === key)[0]), 1);
+    arr1[ ex ].splice(arr1[ ex ].indexOf(arr1[ ex ].filter(item => item.id === key)[ 0 ]), 1);
+    newNodes.splice(newNodes.indexOf(newNodes.filter(item => item.id === key)[ 0 ]), 1);
     this.setState({
       selected: arr,
       selectedNodes: arr1,
@@ -488,19 +610,20 @@ export default class WeaTransfer extends React.Component {
    * 1. 重复时删除
    * 2. 不存在时添加
    */
-  onSelect = (k,val) => {
+  onSelect = (k, val) => {
     //解决Tree组件连续点击产生问题
     if (k.length <= 0) {
       return
-    };
+    }
     //将数组结构的k转换为字符串结构的key
     let key = String(k);
     const { selected, selectedNodes, unsortNodes } = this.state;
+    const { singleElection } = this.props;
     //selected 和 selectedNodes为Object
     let arr = selected;
     let arr1 = selectedNodes;
     let newNodes = unsortNodes;
-    let keypiece = key.slice(0,10);
+    let keypiece = key.slice(0, 10);
     let ex = '';
     switch (keypiece) {
       case this.userex:
@@ -515,13 +638,15 @@ export default class WeaTransfer extends React.Component {
       case this.tagex:
         ex = 'taglist';
         break;
-    };
-    if (arr[ex].indexOf(key) !== -1) {
-      arr[ex].splice(arr[ex].indexOf(key), 1);
+    }
+
+    if (arr[ ex ].indexOf(key) !== -1) {
+
+      arr[ ex ].splice(arr[ ex ].indexOf(key), 1);
       //filter过滤后数据为数组，需要取第一项
-      arr1[ex].splice(arr1[ex].indexOf(arr1[ex].filter(item => item.id === key)[0]), 1);
-      arr1[ex].splice(arr1[ex].indexOf(arr1[ex].filter(item => item.id === key)[0]), 1);
-      newNodes.splice(newNodes.indexOf(newNodes.filter(item => item.id === key)[0]), 1);
+      arr1[ ex ].splice(arr1[ ex ].indexOf(arr1[ ex ].filter(item => item.id === key)[ 0 ]), 1);
+      newNodes.splice(newNodes.indexOf(newNodes.filter(item => item.id === key)[ 0 ]), 1);
+
       this.setState({
         selected: arr,
         selectedNodes: arr1,
@@ -529,10 +654,18 @@ export default class WeaTransfer extends React.Component {
       });
       return true
     } else if (val.selected) {
-      const name = val.selectedNodes[0].props.title.props.children[1].props.children;
-      arr[ex] = [...arr[ex],key];
-      arr1[ex] = [...arr1[ex],{id: key, name: name}];
-      newNodes = [...newNodes,{id: key, name: name}];
+      const name = val.selectedNodes[ 0 ].props.title.props.children[ 1 ].props.children;
+
+      if (singleElection) {
+        arr[ ex ] = [ key ];
+        arr1[ ex ] = [ { id: key, name: name } ];
+        newNodes = [ { id: key, name: name } ];
+      } else {
+        arr[ ex ] = [ ...arr[ ex ], key ];
+        arr1[ ex ] = [ ...arr1[ ex ], { id: key, name: name } ];
+        newNodes = [ ...newNodes, { id: key, name: name } ];
+      }
+
       this.setState({
         selected: arr,
         selectedNodes: arr1,
@@ -547,14 +680,14 @@ export default class WeaTransfer extends React.Component {
    */
   renderChild = (item) => {
     const { advanced } = this.props;
-    const {selected} = this.state;
+    const { selected } = this.state;
     let havePerson = advanced.includes('person');
     //存储所有的子节点
     let children = [];
     if (havePerson) {
       //人员渲染
-      if (item.hrmUserList && item.hrmUserList.length > 0) {
-        let userList = item.hrmUserList.map((k) => {
+      if (item.userlist && item.userlist.length > 0) {
+        let userList = item.userlist.map((k) => {
           let key = `${this.userex}${k.userid}`;
           let match = this.state.matchKeys.indexOf(key) > -1;
           return (
@@ -585,7 +718,7 @@ export default class WeaTransfer extends React.Component {
         let ischecked = bool1 || bool2;
         let match = this.state.matchKeys.indexOf(key) > -1;
         if (havePerson) {
-          if (dept.children && dept.children.length === 0 && dept.hrmUserList.length === 0) {
+          if (dept.children && dept.children.length === 0 && dept.userlist && dept.userlist.length === 0) {
             return (
               <TreeNode
                 title={
@@ -618,7 +751,8 @@ export default class WeaTransfer extends React.Component {
             >
             </TreeNode>
           );
-        };
+        }
+        ;
         return (
           <TreeNode
             title={
@@ -646,10 +780,10 @@ export default class WeaTransfer extends React.Component {
    * @param data
    */
   treeRnder = (data) => {
-
     if (!data || !(data instanceof Array)) {
       return;
-    };
+    }
+
     const { selected } = this.state;
     return data.map(item => {
       let children = this.renderChild(item);
@@ -680,6 +814,81 @@ export default class WeaTransfer extends React.Component {
   };
 
   /**
+   *  异步组织结构树渲染
+   */
+  renderTreeNodes = (data) => {
+    console.log('data',data);
+
+    const { selected } = this.state;
+
+    return data.length > 0 && data.map((item) => {
+        if (!item.isUser) {
+          let key = `${this.deptex}${item.id}`;
+          let key1 = `${this.deptex}${item.id}`;
+          let bool1 = selected.deptlist.indexOf(key1) !== -1;
+          let key2 = `${this.partyex}${item.id}`;
+          let bool2 = selected.partylist.indexOf(String(key2)) !== -1;
+          let ischecked = bool1 || bool2;
+
+          if (item.children) {
+
+            return (
+              <TreeNode
+                title={
+                  <div style={{ color: this.state.disabled ? '#aaa' : '#000000a6' }}>
+                    <Icon type="folder" size="small"/>
+                    <span style={{ marginLeft: 10 }}>{item.name}</span>
+                    {ischecked && <Icon type="check" size="small"/>}
+                  </div>
+                }
+                dataRef={item}
+                selectable={!this.state.disabled}
+                key={key}
+              >
+                {this.renderTreeNodes(item.children)}
+              </TreeNode>
+            )
+          }
+          return (
+            <TreeNode
+              title={
+                <div style={{ color: this.state.disabled ? '#aaa' : '#000000a6' }}>
+                  <Icon type="folder" size="small"/>
+                  <span style={{ marginLeft: 10 }}>{item.name}</span>
+                  {ischecked && <Icon type="check" size="small"/>}
+                </div>
+              }
+              {...item}
+              dataRef={item}
+              selectable={!this.state.disabled}
+              key={key}
+            />
+          )
+        } else {
+          if (!this.props.advanced.includes('person')) {
+            return
+          }
+          let key = `${this.userex}${item.id}`;
+          let match = this.state.matchKeys.indexOf(key) > -1;
+
+          return (
+            <TreeNode
+              title={
+                <div>
+                  <Icon type="user" size="small"/>
+                  <span style={{ marginLeft: 10 }} className={match ? 'searched' : ''}>{item.name}</span>
+                  {selected.userlist.indexOf(key) !== -1 && <Icon type="check" size="small"/>}
+                </div>
+              }
+              key={key}
+              isLeaf
+            />
+          );
+        }
+      });
+  };
+
+  /**
    * 标签列表渲染
    * @param data
    */
@@ -687,22 +896,38 @@ export default class WeaTransfer extends React.Component {
     if (!data || !(data instanceof Array)) {
       return;
     }
-    return data.map(item => {
-      let key = `${this.tagex}${item.tagid}`;
+
+    if (data.length === 0) {
       return (
-        <TreeNode
-          title={
-            <div>
-              <Icon type="tag-o" size="small"/>
-              <span style={{ marginLeft: 10 }}>{item.tagname}</span>
-              {this.state.selected.taglist.indexOf(key) !== -1&&<Icon type="check" size="small"/>}
-            </div>
-          }
-          key={key}
-          isLeaf
-        />
+        <div className="notag">
+          <Icon type="tag-o"/>
+          <p>暂无标签</p>
+        </div>
       )
-    })
+    }
+    return (
+      <Tree
+        key
+        onSelect={this.onSelect}
+      >
+        {data.map(item => {
+          let key = `${this.tagex}${item.tagid}`;
+          return (
+            <TreeNode
+              title={
+                <div>
+                  <Icon type="tag-o" size="small"/>
+                  <span style={{ marginLeft: 10 }}>{item.tagname}</span>
+                  {this.state.selected.taglist.indexOf(key) !== -1 && <Icon type="check" size="small"/>}
+                </div>
+              }
+              key={key}
+              isLeaf
+            />
+          )
+        })}
+      </Tree>
+    )
   };
 
   //右侧选中列表渲染
@@ -713,7 +938,7 @@ export default class WeaTransfer extends React.Component {
     let nodes = [];
 
     unsortNodes.forEach(item => {
-      let idpiece = item.id.slice(0,10);
+      let idpiece = item.id.slice(0, 10);
 
       if ('mydept' === idpiece && this.state.mydeptChecked) {
         const checked = selectedNodes.mydept === 5 ? true : (selectedNodes.mydept === 6 ? false : true);
@@ -721,8 +946,9 @@ export default class WeaTransfer extends React.Component {
           <li key='mydept'>
             <Icon type='folder' size="small"/>
             <span>本部门</span>
-            <Icon type="close" size="small" onClick={this.regret.bind(this,'mydept')}/>
-            {this.state.nextDept && <Checkbox name='mydept' defaultChecked={checked} onChange={this.subordinate}>含下级部门</Checkbox>}
+            <Icon type="close" size="small" onClick={this.regret.bind(this, 'mydept')}/>
+            {this.state.nextDept &&
+            <Checkbox name='mydept' defaultChecked={checked} onChange={this.subordinate}>含下级部门</Checkbox>}
           </li>
         )
       }
@@ -733,7 +959,8 @@ export default class WeaTransfer extends React.Component {
             <Icon type='folder' size="small"/>
             <span>{item.name}</span>
             <Icon type="close" size="small" onClick={this.regret.bind(this, item.id)}/>
-            {this.state.nextDept && <Checkbox name={item.id} defaultChecked={false} onChange={this.subordinate}>含下级部门</Checkbox>}
+            {this.state.nextDept &&
+            <Checkbox name={item.id} defaultChecked={false} onChange={this.subordinate}>含下级部门</Checkbox>}
           </li>
         )
       }
@@ -775,71 +1002,147 @@ export default class WeaTransfer extends React.Component {
   };
 
   /**
+   * 加载搜索渲染结果
+   */
+  searchedRender = (data) => {
+    if (!data) {
+      return
+    }
+
+    let children = [];
+
+    children = data.department && data.department.length > 0 && data.department.map(dept => {
+
+        let key = `${this.deptex}${dept.id}`;
+        let key1 = `${this.deptex}${dept.id}`;
+        let bool1 = this.state.selected.deptlist.indexOf(key1) !== -1;
+        let key2 = `${this.partyex}${dept.id}`;
+        let bool2 = this.state.selected.partylist.indexOf(String(key2)) !== -1;
+        let ischecked = bool1 || bool2;
+
+        return (
+          <TreeNode
+            title={
+              <div style={{ color: this.state.disabled ? '#aaa' : '#000000a6' }}>
+                <Icon type="folder" size="small"/>
+                <span style={{ marginLeft: 10 }}>{dept.name}</span>
+                {ischecked && <Icon type="check" size="small"/>}
+              </div>
+            }
+            key={key}
+          />)
+      });
+
+    if (this.props.advanced.includes('person')) {
+
+      this.tools.isEmptyArr(data.userlist);
+
+      children = children.concat(
+        data.userlist.map(user => {
+          let key = `${this.userex}${user.id}`;
+          return (
+            <TreeNode
+              title={
+                <div>
+                  <Icon type="user" size="small"/>
+                  <span style={{ marginLeft: 10 }}>{user.name}</span>
+                  {this.state.selected.userlist.indexOf(key) !== -1 && <Icon type="check" size="small"/>}
+                </div>
+              }
+              key={key}
+              isLeaf
+            />);
+        }));
+    }
+    return (
+      <Tree
+        onSelect={this.onSelect}
+      >
+        {children}
+      </Tree>
+    )
+  };
+
+  /**
    * 搜索
    * @param data
    * @param tree
    * @param e
    */
   search = (val) => {
-    //设置树节点可自动展开
-    this.isAutoExpandParent(true);
-    //获取搜索框输入
-    const value = val;
-    if (value === '') {
-      this.setState({
-        expandedKeys: []
-      });
+    if (val === '') {
+      this.setState({ isSearching: false });
       return
     }
-    const { searchData, orgPerson } = this.state;
-    let list = searchData;
-    /**
-     * 根据输出获取展开值
-     * data为部门一维数据
-     */
-    let expandedKeys = [];
-    let matchKeys = [];
 
-    list.forEach((item) => {
-      if (item.name.indexOf(value) > -1) {
-        /**
-         *  如果输入值key存在，查找该节点的父节点
-         */
-        matchKeys.push(`${this.deptex}${item.id}`);
-        expandedKeys = expandedKeys.concat(this.getParentKey(item.id, orgPerson));
-      } else if (item.hrmUserList && item.hrmUserList.length > 0) {
-        /**
-         * 搜索名目为人员
-         * @type {Array}
-         */
-        let parentKeys = [];
-        item.hrmUserList.forEach(val => {
-          if (val.name.indexOf(value) > -1) {
-            if (item.id) {
-              console.log('');
-              matchKeys.push(`${this.userex}${val.userid}`);
-              parentKeys.push(`${this.deptex}${item.id}`);
-            }
-          }
-        });
-
-        expandedKeys = expandedKeys.concat(parentKeys);
-      } else {
-        /**
-         *  如果输入值key不存在，返回空
-         */
-      }
-    });
-
-    //expandedKeys成员类型为string,并过滤空数组
-    let keys = expandedKeys.filter(item => !(item instanceof Array));
-
-    this.setState({
-      expandedKeys: keys,
-      searchValue: value,
-      matchKeys
+    const fetch_user = this.props.advanced.includes('person');
+    this.Request.search(val, fetch_user, json => {
+      this.setState({
+        isSearching: true,
+        searchValue: json
+      })
     });
   };
+  // /*search = (val) => {
+  //   //设置树节点可自动展开
+  //   this.isAutoExpandParent(true);
+  //   //获取搜索框输入
+  //   const value = val;
+  //   if (value === '') {
+  //     this.setState({
+  //       expandedKeys: []
+  //     });
+  //     return
+  //   }
+  //   const { searchData, orgPerson } = this.state;
+  //   let list = searchData;
+  //   /!**
+  //    * 根据输出获取展开值
+  //    * data为部门一维数据
+  //    *!/
+  //   let expandedKeys = [];
+  //   let matchKeys = [];
+  //
+  //   list.forEach((item) => {
+  //     if (item.name.indexOf(value) > -1) {
+  //       /!**
+  //        *  如果输入值key存在，查找该节点的父节点
+  //        *!/
+  //       matchKeys.push(`${this.deptex}${item.id}`);
+  //       expandedKeys = expandedKeys.concat(this.getParentKey(item.id, orgPerson));
+  //     } else if (item.userlist && item.userlist.length > 0) {
+  //       /!**
+  //        * 搜索名目为人员
+  //        * @type {Array}
+  //        *!/
+  //       let parentKeys = [];
+  //       item.userlist.forEach(val => {
+  //         if (val.name.indexOf(value) > -1) {
+  //           if (item.id) {
+  //             console.log('');
+  //             matchKeys.push(`${this.userex}${val.userid}`);
+  //             parentKeys.push(`${this.deptex}${item.id}`);
+  //           }
+  //         }
+  //       });
+  //
+  //       expandedKeys = expandedKeys.concat(parentKeys);
+  //     } else {
+  //       /!**
+  //        *  如果输入值key不存在，返回空
+  //        *!/
+  //     }
+  //   });
+  //
+  //   //expandedKeys成员类型为string,并过滤空数组
+  //   let keys = expandedKeys.filter(item => !(item instanceof Array));
+  //
+  //   this.setState({
+  //     expandedKeys: keys,
+  //     searchValue: value,
+  //     matchKeys
+  //   });
+  // };*/
 
   /**
    * 获取父节点key值，得到需要展开的节点
@@ -874,11 +1177,3 @@ export default class WeaTransfer extends React.Component {
     return parentKey;
   };
 }
-
-WeaTransfer.propTypes = {
-  // defaultSelected: PropTypes.object,
-/*  visible: PropTypes.bool.isRequired,
-  advanced: PropTypes.array,
-  onSubmit: PropTypes.func.isRequired,
-  onCancel: PropTypes.func.isRequired,*/
-};

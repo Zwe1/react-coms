@@ -101,12 +101,25 @@ export default class WeaPermission extends React.Component {
           })
         }
       }
-      if (props.type === 'agent') {
-        this.getAgentList();
-      } else if (props.type === 'hrm') {
+      const { type, data } = props;
+      if (type === 'agent') {
+        if (data) {
+          this.setState({
+            data: data
+          })
+        } else {
+          this.getAgentList();
+        }
+      } else if (type === 'hrm') {
         this.getOrgList();
-      } else if (props.type === 'portal') {
-        this.getPortalList();
+      } else if (type === 'portal') {
+        if (data) {
+          this.setState({
+            portalData: data
+          })
+        } else {
+          this.getPortalList();
+        }
       }
     }
   }
@@ -114,11 +127,23 @@ export default class WeaPermission extends React.Component {
   componentDidMount() {
     const {type} = this.props;
     if (type === 'agent') {
-      this.getAgentList();
+      if (this.props.data) {
+        this.setState({
+          data: this.props.data
+        })
+      } else {
+        this.getAgentList();
+      }
     } else if (type === 'hrm') {
       this.getOrgList();
     } else if (type === 'portal') {
-      this.getPortalList();
+      if (this.props.data) {
+        this.setState({
+          portalData: this.props.data
+        })
+      } else {
+        this.getPortalList();
+      }
     }
   }
 

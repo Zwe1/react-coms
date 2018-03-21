@@ -39,159 +39,166 @@ class WeaSelectionRangeDisplay extends React.Component {
               </a>
             </div>)
         }
-        <div style={{display: "inline-block", marginTop: 10}}>
-          {
-            selectedNodes.mydept && (selectedNodes.mydept == 5) ? (
-              <span
-                style={{border: "1px solid #999999", padding: "5px 5px", marginRight: "10px"}}
-              >
+        {
+          ((selectedNodes.mydept && (selectedNodes.mydept == 5 || selectedNodes.mydept == 6)) ||
+            (selectedNodes.deptlist && selectedNodes.deptlist.length > 0) ||
+            (selectedNodes.partylist && selectedNodes.partylist.length > 0) ||
+            (selectedNodes.userlist && selectedNodes.userlist.length > 0) ||
+            (selectedNodes.taglist && selectedNodes.taglist.length > 0)) ?
+            <div style={{display: "inline-block"}}>
+              {
+                selectedNodes.mydept && (selectedNodes.mydept == 5) ? (
+                  <span
+                    style={{border: "1px solid #999999", padding: "5px 5px", marginRight: "10px"}}
+                  >
                 <Icon
                   type="folder-open"
                   style={{fontSize: 13}}
                 />
                 本部门
               </span>
-            ) : (
-              (selectedNodes.mydept == 6) ? (
-                <span
-                  style={{border: "1px solid #999999", padding: "5px 5px", marginRight: "10px"}}
-                >
+                ) : (
+                  (selectedNodes.mydept == 6) ? (
+                    <span
+                      style={{border: "1px solid #999999", padding: "5px 5px", marginRight: "10px"}}
+                    >
                 <Icon
                   type="folder"
                   style={{fontSize: 13}}
                 />
                 本部门
                 </span>
-              ) : ("")
-            )
-          }
-          {
-            selectedNodes.deptlist && selectedNodes.deptlist.map(dept => {
-              return (
-                <span
-                  key={dept.id}
-                  style={{border: "1px solid #999999", padding: "5px 5px", marginRight: "10px"}}
-                >
+                  ) : ("")
+                )
+              }
+              {
+                selectedNodes.deptlist && selectedNodes.deptlist.map(dept => {
+                  return (
+                    <span
+                      key={dept.id}
+                      style={{border: "1px solid #999999", padding: "5px 5px", marginRight: "10px"}}
+                    >
                   <Icon
                     type="folder"
                     style={{fontSize: 13}}
                   />
-                  {dept.name}
-                  {
-                    this.props.deleteIconDisabled ?
-                      "" :
-                      (
-                        <Icon
-                          type="close"
-                          style={{
-                            fontSize: 13,
-                            cursor: "pointer",
-                            marginLeft: 5
-                          }}
-                          onClick={this.onDeleteIconClick.bind(this, "DEPT", dept.id)}
-                        />
-                      )
-                  }
+                      {dept.name}
+                      {
+                        this.props.deleteIconDisabled ?
+                          "" :
+                          (
+                            <Icon
+                              type="close"
+                              style={{
+                                fontSize: 13,
+                                cursor: "pointer",
+                                marginLeft: 5
+                              }}
+                              onClick={this.onDeleteIconClick.bind(this, "DEPT", dept.id)}
+                            />
+                          )
+                      }
 
                 </span>
-              );
-            })
-          }
-          {
-            selectedNodes.partylist && selectedNodes.partylist.map(party => {
-              return (
-                <span
-                  key={party.id}
-                  style={{border: "1px solid #999999", padding: "5px 5px", marginRight: "10px"}}
-                >
+                  );
+                })
+              }
+              {
+                selectedNodes.partylist && selectedNodes.partylist.map(party => {
+                  return (
+                    <span
+                      key={party.id}
+                      style={{border: "1px solid #999999", padding: "5px 5px", marginRight: "10px"}}
+                    >
                   <Icon
                     type="folder-open"
                     style={{fontSize: 13}}
                   />
-                  {party.name}
-                  {
-                    this.props.deleteIconDisabled ?
-                      "" :
-                      (
-                        <Icon
-                          type="close"
-                          style={{
-                            fontSize: 13,
-                            cursor: "pointer",
-                            marginLeft: 5
-                          }}
-                          onClick={this.onDeleteIconClick.bind(this, "PARTY", party.id)}
-                        />
-                      )
-                  }
+                      {party.name}
+                      {
+                        this.props.deleteIconDisabled ?
+                          "" :
+                          (
+                            <Icon
+                              type="close"
+                              style={{
+                                fontSize: 13,
+                                cursor: "pointer",
+                                marginLeft: 5
+                              }}
+                              onClick={this.onDeleteIconClick.bind(this, "PARTY", party.id)}
+                            />
+                          )
+                      }
 
                 </span>
-              );
-            })
-          }
-          {
-            selectedNodes.userlist && selectedNodes.userlist.map(user => {
-              return (
-                <span
-                  key={user.id}
-                  style={{border: "1px solid #999999", padding: "5px 5px", marginRight: "10px"}}
-                >
+                  );
+                })
+              }
+              {
+                selectedNodes.userlist && selectedNodes.userlist.map(user => {
+                  return (
+                    <span
+                      key={user.id}
+                      style={{border: "1px solid #999999", padding: "5px 5px", marginRight: "10px"}}
+                    >
                   <Icon
                     type="user"
                     style={{fontSize: 13}}
                   />
-                  {user.name}
-                  {
-                    this.props.deleteIconDisabled ?
-                      "" :
-                      (
-                        <Icon
-                          type="close"
-                          style={{
-                            fontSize: 13,
-                            cursor: "pointer",
-                            marginLeft: 5
-                          }}
-                          onClick={this.onDeleteIconClick.bind(this, "USER", user.id)}
-                        />
-                      )
-                  }
+                      {user.name}
+                      {
+                        this.props.deleteIconDisabled ?
+                          "" :
+                          (
+                            <Icon
+                              type="close"
+                              style={{
+                                fontSize: 13,
+                                cursor: "pointer",
+                                marginLeft: 5
+                              }}
+                              onClick={this.onDeleteIconClick.bind(this, "USER", user.id)}
+                            />
+                          )
+                      }
                 </span>
-              );
-            })
-          }
-          {
-            selectedNodes.taglist && selectedNodes.taglist.map(tag => {
-              return (
-                <span
-                  key={tag.id}
-                  style={{border: "1px solid #999999", padding: "5px 5px", marginRight: "10px"}}
-                >
+                  );
+                })
+              }
+              {
+                selectedNodes.taglist && selectedNodes.taglist.map(tag => {
+                  return (
+                    <span
+                      key={tag.id}
+                      style={{border: "1px solid #999999", padding: "5px 5px", marginRight: "10px"}}
+                    >
                   <Icon
                     type="tag-o"
                     style={{fontSize: 13}}
                   />
-                  {tag.name}
-                  {
-                    this.props.deleteIconDisabled ?
-                      "" :
-                      (
-                        <Icon
-                          type="close"
-                          style={{
-                            fontSize: 13,
-                            cursor: "pointer",
-                            marginLeft: 5
-                          }}
-                          onClick={this.onDeleteIconClick.bind(this, "TAG", tag.id)}
-                        />
-                      )
-                  }
+                      {tag.name}
+                      {
+                        this.props.deleteIconDisabled ?
+                          "" :
+                          (
+                            <Icon
+                              type="close"
+                              style={{
+                                fontSize: 13,
+                                cursor: "pointer",
+                                marginLeft: 5
+                              }}
+                              onClick={this.onDeleteIconClick.bind(this, "TAG", tag.id)}
+                            />
+                          )
+                      }
                 </span>
-              );
-            })
-          }
-        </div>
+                  );
+                })
+              }
+            </div> : "暂无数据"
+        }
       </div>
     );
   }
