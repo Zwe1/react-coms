@@ -15,8 +15,11 @@ export default class WeaTransfer extends React.Component {
     advanced: [ 'dept' ],
     placeholder: "搜索部门",
     mode: 'async',
-    singleElection: false,
-    globalSearch: false
+    singleElection: false, //单选开关
+    globalSearch: false,
+    selectNextdept: true, //默认勾选含下级
+    okText: '确定',
+    cancelText: '取消',
   };
 
   constructor(props) {
@@ -26,7 +29,6 @@ export default class WeaTransfer extends React.Component {
     this.state = {
       expandedKeys: [],
       matchKeys: [],
-      searchValue: '',
       selected: { 'userlist': [], 'deptlist': [], 'partylist': [], 'taglist': [], 'mydept': 0 },
       selectedNodes: { 'userlist': [], 'deptlist': [], 'partylist': [], 'taglist': [], 'mydept': 0 },
       unsortNodes: [],
@@ -48,6 +50,7 @@ export default class WeaTransfer extends React.Component {
       },//当前组织维度
       isSearching: false,//搜索中
       searchValue: {},
+      defaultSelected:[], //默认被选中的节点
     };
     this.userex = 'userlist-+';
     this.tagex = 'taglist-+-';
@@ -132,6 +135,7 @@ export default class WeaTransfer extends React.Component {
 
     //按输入为组件添加默认选中和默认展开
     if (props.defaultSelected) {
+
       if (props.defaultSelected === this.state.selected) {
 
         return false
@@ -141,8 +145,10 @@ export default class WeaTransfer extends React.Component {
         let keys = { 'userlist': [], 'deptlist': [], 'partylist': [], 'taglist': [], 'mydept': 0 };
         let nodes = { 'userlist': [], 'deptlist': [], 'partylist': [], 'taglist': [], 'mydept': 0 };
         let unsortNodes = [];
+        let defaultSelectedTreeNode = [];//默认选择的treeNode
 
         let id = '';
+        let treeNodeId = '';//用于默认选中treeNode的ID，为了解决partylist的选项不能被tree识别的问题
         let newitem = {};
         if (selected.mydept) {
           if (selected.mydept === 5 || selected.mydept === 6) {
@@ -163,18 +169,20 @@ export default class WeaTransfer extends React.Component {
           };
           selected[ t ] instanceof Array && selected[ t ].forEach(item => {
             id = `${ex[ t ]}${item.id}`;
+            treeNodeId = t !== 'partylist'?`${ex[ t ]}${item.id}`:`deptlist-+${item.id}`;//含下级的partylist当作deptlist处理
             newitem = { 'id': id, 'name': item.name };
             keys[ t ].push(id);
             nodes[ t ].push(newitem);
             unsortNodes.push(newitem);
+            defaultSelectedTreeNode.push(treeNodeId);//默认树节点
           });
         }
-        ;
 
         this.setState({
           selected: keys,
           selectedNodes: nodes,
-          unsortNodes: unsortNodes
+          unsortNodes: unsortNodes,
+          defaultSelected:defaultSelectedTreeNode
         });
       }
 
@@ -183,8 +191,47 @@ export default class WeaTransfer extends React.Component {
         selected: { 'userlist': [], 'deptlist': [], 'partylist': [], 'taglist': [], 'mydept': 0 }
       })
     }
-  };
 
+    //外部传入组织维度(直接将接口获取的组织维度数组传入即可)
+    if(props.orgDimension){
+      const orgDimension = props.orgDimension;
+      if(Array.isArray(orgDimension)){
+        if(orgDimension.length === this.state.orgDimension.length){
+          for(let i = 0;i < orgDimension.length;i++){
+            if(orgDimension[i]['id'] !== this.state.orgDimension[i]['id']){
+              this.setState({
+                orgDimension:orgDimension.map(item => {
+                  return {
+                    'name': item.name,
+                    'key': item.id,
+                    'id': item.id,
+                    'isLeaf': !item.hasnext,
+                    'order': item.order,
+                  }
+                })
+              });
+              break;
+            }
+          }
+        } else {
+          this.setState({
+            orgDimension:orgDimension.map(item => {
+              return {
+                'name': item.name,
+                'key': item.id,
+                'id': item.id,
+                'isLeaf': !item.hasnext,
+                'order': item.order,
+              }
+            })
+          });
+        }
+      }
+    }
+  };
+  // componentWillUnmount(){
+  //   alert(1);
+  // }
   render() {
     const {
       title,
@@ -193,7 +240,9 @@ export default class WeaTransfer extends React.Component {
       advanced,
       placeholder,
       mode,
-      singleElection
+      singleElection,
+      okText,
+      cancelText,
     } = this.props;
 
     const {
@@ -215,7 +264,7 @@ export default class WeaTransfer extends React.Component {
 
     const menu = (
       <Menu
-        className="demension-dropdown"
+        className="demension-dropdown demension-dropdown-modal"
         onClick={this.changeDimension}
       >
         {orgDimension.length > 0 && orgDimension.map(org => {
@@ -236,13 +285,16 @@ export default class WeaTransfer extends React.Component {
         visible={visible}
         onOk={this.onOk}
         onCancel={this.cancel}
+        destroyOnClose={true}
+        maskClosable={false}
         zIndex="1001"
         style={{
           top: smallScreen ? 30 : 100
         }}
+        className="wea-transfer"
         width={ singleElection ? 424 : 850 }
-        okText="确认"
-        cancelText="取消"
+        okText={okText}
+        cancelText={cancelText}
       >
         <div className="member-tree transferTree">
 
@@ -251,16 +303,19 @@ export default class WeaTransfer extends React.Component {
             onSearch={(val) => this.search(val)}
           />
 
-          <Dropdown
-            overlay={menu}
-            className="demension-dropdown"
-            placement="bottomLeft"
-            trigger={[ 'click' ]}
-          >
-            <div>
-              {activeDemision.orgName} <Icon type="down"/>
-            </div >
-          </Dropdown>
+          {(advanced.includes('tag') && !tagshow) ?
+          <div className="gosh-empty">我的标签</div>:
+            <Dropdown
+              overlay={menu}
+              className="demension-dropdown"
+              placement="bottomLeft"
+              trigger={[ 'click' ]}
+            >
+              <div>
+                {activeDemision.orgName} <Icon type="down"/>
+              </div >
+            </Dropdown>
+          }
 
           {advanced.includes('tag') && !tagshow &&
           <div className="type">
@@ -272,7 +327,7 @@ export default class WeaTransfer extends React.Component {
           <Scrollbars
             autoHide
             style={{
-              height: advanced.includes('tag') ? 325 : 373,
+              height: 373,
               background: '#F9FAFC'
             }}
           >
@@ -298,6 +353,9 @@ export default class WeaTransfer extends React.Component {
                 onExpand={this.onExpand}
                 expandedKeys={expandedKeys}
                 onSelect={this.onSelect}
+                multiple={!singleElection}
+                // selectedKeys={this.state.defaultSelected}
+                defaultSelectedKeys={this.state.defaultSelected}
                 autoExpandParent={autoExpandParent}
               >
                 {
@@ -476,9 +534,11 @@ export default class WeaTransfer extends React.Component {
     const { onCancel } = this.props;
     this.setState({
       mydeptChecked: false,
+      leftContent:'tree',
       unsortNodes: [],
       expandedKeys: [],
       searchValue: '',
+      defaultSelected:[],
       matchKeys: [],
       selected: { 'userlist': [], 'deptlist': [], 'partylist': [], 'taglist': [], 'mydept': 0 },
       selectedNodes: { 'userlist': [], 'deptlist': [], 'partylist': [], 'taglist': [], 'mydept': 0 }
@@ -534,6 +594,8 @@ export default class WeaTransfer extends React.Component {
     //清空数据
     this.setState({
       expandedKeys: [],
+      unsortNodes: [],
+      leftContent:'tree',
       selected: { 'userlist': [], 'deptlist': [], 'partylist': [], 'taglist': [], 'mydept': 0 },
       selectedNodes: { 'userlist': [], 'deptlist': [], 'partylist': [], 'taglist': [], 'mydept': 0 }
     });
@@ -610,15 +672,19 @@ export default class WeaTransfer extends React.Component {
    * 1. 重复时删除
    * 2. 不存在时添加
    */
-  onSelect = (k, val) => {
+  onSelect = (key1, val) => {
+
+    console.log('key-val',key1,val);
+
     //解决Tree组件连续点击产生问题
-    if (k.length <= 0) {
-      return
-    }
+    // if (key1.length <= 0) {
+    //   return
+    // }
     //将数组结构的k转换为字符串结构的key
-    let key = String(k);
+    // let key = String(key1);
+    let key = String(val.node.props.eventKey);
     const { selected, selectedNodes, unsortNodes } = this.state;
-    const { singleElection } = this.props;
+    const { singleElection, selectNextdept } = this.props;
     //selected 和 selectedNodes为Object
     let arr = selected;
     let arr1 = selectedNodes;
@@ -640,12 +706,21 @@ export default class WeaTransfer extends React.Component {
         break;
     }
 
-    if (arr[ ex ].indexOf(key) !== -1) {
+    //取消选中部门时使用的k
+    let k = `${this.partyex}${key.slice(10)}`;
+    console.log()
+    if (arr[ ex ].indexOf(key) !== -1 || (ex !== 'taglist' && arr[ 'partylist' ].indexOf(k) !== -1)) {
 
-      arr[ ex ].splice(arr[ ex ].indexOf(key), 1);
-      //filter过滤后数据为数组，需要取第一项
-      arr1[ ex ].splice(arr1[ ex ].indexOf(arr1[ ex ].filter(item => item.id === key)[ 0 ]), 1);
-      newNodes.splice(newNodes.indexOf(newNodes.filter(item => item.id === key)[ 0 ]), 1);
+      if (ex === 'deptlist' && arr[ 'partylist' ].indexOf(k) !== -1) {
+        arr[ 'partylist' ].splice(arr[ 'partylist' ].indexOf(k), 1);
+        arr1[ 'partylist' ].splice(arr1[ 'partylist' ].indexOf(arr1[ 'partylist' ].filter(item => item.id === k)[ 0 ]), 1);
+        newNodes.splice(newNodes.indexOf(newNodes.filter(item => item.id === k)[ 0 ]), 1);
+      } else {
+        arr[ ex ].splice(arr[ ex ].indexOf(key), 1);
+        //filter过滤后数据为数组，需要取第一项
+        arr1[ ex ].splice(arr1[ ex ].indexOf(arr1[ ex ].filter(item => item.id === key)[ 0 ]), 1);
+        newNodes.splice(newNodes.indexOf(newNodes.filter(item => item.id === key)[ 0 ]), 1);
+      }
 
       this.setState({
         selected: arr,
@@ -654,16 +729,25 @@ export default class WeaTransfer extends React.Component {
       });
       return true
     } else if (val.selected) {
-      const name = val.selectedNodes[ 0 ].props.title.props.children[ 1 ].props.children;
+      // const name = val.selectedNodes[ 0 ].props.title.props.children[ 1 ].props.children;
+      const name = keypiece === 'taglist-+-'?val.node.props.tagname:val.node.props.name;
 
       if (singleElection) {
         arr[ ex ] = [ key ];
         arr1[ ex ] = [ { id: key, name: name } ];
         newNodes = [ { id: key, name: name } ];
       } else {
-        arr[ ex ] = [ ...arr[ ex ], key ];
-        arr1[ ex ] = [ ...arr1[ ex ], { id: key, name: name } ];
-        newNodes = [ ...newNodes, { id: key, name: name } ];
+
+        let masterK = ex;
+        let newkey = key;
+        if (ex === 'deptlist' && this.props.advanced.includes('nextdept') && selectNextdept) {
+          masterK = 'partylist';
+          newkey = k;
+        }
+
+        arr[ masterK ] = [ ...arr[ masterK ], newkey ];
+        arr1[ masterK ] = [ ...arr1[ masterK ], { id: newkey, name: name } ];
+        newNodes = [ ...newNodes, { id: newkey, name: name } ];
       }
 
       this.setState({
@@ -674,6 +758,7 @@ export default class WeaTransfer extends React.Component {
       return true
     }
   };
+
 
   /**
    * 企业组织架构（部门）
@@ -752,7 +837,7 @@ export default class WeaTransfer extends React.Component {
             </TreeNode>
           );
         }
-        ;
+
         return (
           <TreeNode
             title={
@@ -817,7 +902,6 @@ export default class WeaTransfer extends React.Component {
    *  异步组织结构树渲染
    */
   renderTreeNodes = (data) => {
-    console.log('data',data);
 
     const { selected } = this.state;
 
@@ -829,7 +913,7 @@ export default class WeaTransfer extends React.Component {
           let key2 = `${this.partyex}${item.id}`;
           let bool2 = selected.partylist.indexOf(String(key2)) !== -1;
           let ischecked = bool1 || bool2;
-
+          
           if (item.children) {
 
             return (
@@ -841,6 +925,7 @@ export default class WeaTransfer extends React.Component {
                     {ischecked && <Icon type="check" size="small"/>}
                   </div>
                 }
+                {...item}
                 dataRef={item}
                 selectable={!this.state.disabled}
                 key={key}
@@ -880,6 +965,7 @@ export default class WeaTransfer extends React.Component {
                   {selected.userlist.indexOf(key) !== -1 && <Icon type="check" size="small"/>}
                 </div>
               }
+              {...item}
               key={key}
               isLeaf
             />
@@ -893,6 +979,7 @@ export default class WeaTransfer extends React.Component {
    * @param data
    */
   tagRender = (data) => {
+    const {singleElection} = this.props;
     if (!data || !(data instanceof Array)) {
       return;
     }
@@ -909,6 +996,8 @@ export default class WeaTransfer extends React.Component {
       <Tree
         key
         onSelect={this.onSelect}
+        defaultSelectedKeys={this.state.defaultSelected}
+        multiple={!singleElection}
       >
         {data.map(item => {
           let key = `${this.tagex}${item.tagid}`;
@@ -923,6 +1012,7 @@ export default class WeaTransfer extends React.Component {
               }
               key={key}
               isLeaf
+              {...item}
             />
           )
         })}
@@ -1005,8 +1095,8 @@ export default class WeaTransfer extends React.Component {
    * 加载搜索渲染结果
    */
   searchedRender = (data) => {
-    if (!data) {
-      return
+    if (!data || data.department.length === 0) {
+      return <span>无匹配结果</span>
     }
 
     let children = [];
@@ -1033,10 +1123,7 @@ export default class WeaTransfer extends React.Component {
           />)
       });
 
-    if (this.props.advanced.includes('person')) {
-
-      this.tools.isEmptyArr(data.userlist);
-
+    if (this.props.advanced.includes('person') && data.userlist && data.userlist.length > 0) {
       children = children.concat(
         data.userlist.map(user => {
           let key = `${this.userex}${user.id}`;
@@ -1054,6 +1141,7 @@ export default class WeaTransfer extends React.Component {
             />);
         }));
     }
+
     return (
       <Tree
         onSelect={this.onSelect}
